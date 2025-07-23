@@ -9,6 +9,19 @@ local directions = {
     {q = 0, r = 1},   -- SE
 }
 
+-- Функція для перевірки, чи знаходиться координата в межах п'ятикутного поля з 5 комірками на грань
+local function isValidPosition(q, r)
+    -- Для п'ятикутного поля з радіусом 4 (5 комірок на грань)
+    local radius = 4
+    
+    -- Перевірка меж шестикутника
+    if math.abs(q) > radius or math.abs(r) > radius or math.abs(q + r) > radius then
+        return false
+    end
+    
+    return true
+end
+
 local function getPieceAt(pieces, q, r)
     for _, piece in ipairs(pieces) do
         if piece.q == q and piece.r == r then
@@ -26,19 +39,21 @@ function Rules.getValidMoves(piece, pieces)
         for _, dir in ipairs(directions) do
             local q, r = piece.q + dir.q, piece.r + dir.r
 
-            -- Ходьба до першої зайнятої
-            while not getPieceAt(pieces, q, r) do
+            -- Ходьба до першої зайнятої (з перевіркою меж)
+            while isValidPosition(q, r) and not getPieceAt(pieces, q, r) do
                 table.insert(moves, {q = q, r = r})
                 q = q + dir.q
                 r = r + dir.r
             end
 
             -- Якщо є ворожа фішка — перевіряємо, чи можна стрибнути далі
-            local mid = getPieceAt(pieces, q, r)
-            if mid and mid.player ~= piece.player then
-                local jumpQ, jumpR = q + dir.q, r + dir.r
-                if not getPieceAt(pieces, jumpQ, jumpR) then
-                    table.insert(moves, {q = jumpQ, r = jumpR, capture = {q = q, r = r}})
+            if isValidPosition(q, r) then
+                local mid = getPieceAt(pieces, q, r)
+                if mid and mid.player ~= piece.player then
+                    local jumpQ, jumpR = q + dir.q, r + dir.r
+                    if isValidPosition(jumpQ, jumpR) and not getPieceAt(pieces, jumpQ, jumpR) then
+                        table.insert(moves, {q = jumpQ, r = jumpR, capture = {q = q, r = r}})
+                    end
                 end
             end
         end
@@ -54,25 +69,28 @@ function Rules.getValidMoves(piece, pieces)
         forwardDirs = { {q = 1, r = -1}, {q = 0, r = -1} } -- NE і NW
     end
 
-    -- Ходи вперед
+    -- Ходи вперед (з перевіркою меж)
     for _, dir in ipairs(forwardDirs) do
         local q = piece.q + dir.q
         local r = piece.r + dir.r
-        if not getPieceAt(pieces, q, r) then
+        if isValidPosition(q, r) and not getPieceAt(pieces, q, r) then
             table.insert(moves, {q = q, r = r})
         end
     end
 
-    -- Захоплення — в усіх напрямках
+    -- Захоплення — в усіх напрямках (з перевіркою меж)
     for _, dir in ipairs(directions) do
         local midQ = piece.q + dir.q
         local midR = piece.r + dir.r
         local jumpQ = midQ + dir.q
         local jumpR = midR + dir.r
 
-        local target = getPieceAt(pieces, midQ, midR)
-        if target and target.player ~= piece.player and not getPieceAt(pieces, jumpQ, jumpR) then
-            table.insert(moves, {q = jumpQ, r = jumpR, capture = {q = midQ, r = midR}})
+        -- Перевіряємо межі для всіх позицій
+        if isValidPosition(midQ, midR) and isValidPosition(jumpQ, jumpR) then
+            local target = getPieceAt(pieces, midQ, midR)
+            if target and target.player ~= piece.player and not getPieceAt(pieces, jumpQ, jumpR) then
+                table.insert(moves, {q = jumpQ, r = jumpR, capture = {q = midQ, r = midR}})
+            end
         end
     end
 
